@@ -1,0 +1,87 @@
+import { Injectable } from '@angular/core';
+import { CanActivate, CanActivateChild, ActivatedRouteSnapshot, RouterStateSnapshot, UrlTree, Router, Route, ActivatedRoute } from '@angular/router';
+import { Observable } from 'rxjs';
+import { sharedService } from "../service/shared-service.service";
+import { UserIdleService } from 'angular-user-idle';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthGuard implements CanActivate {
+  constructor(private sharedService: sharedService, private router: Router) { }
+  userDetailsData: any = "";
+  username: any = '';
+  public adminDetails: any = '';
+  public isAdmin: boolean = false;
+  public actualURL:any="";
+  public redirectURL:any=0;
+
+  canActivate(next: ActivatedRouteSnapshot, state: RouterStateSnapshot): Observable<boolean> | Promise<boolean> | boolean {
+    if (this.sharedService.isAuthenticated()) {
+
+      if (localStorage.getItem("UserName") == null) {
+        this.sharedService.getUserDeatails_api();
+      }
+      if(this.redirectURL==0){
+        this.router.navigate('./'[localStorage.getItem("currentURL")]);
+        this.redirectURL=1;
+      }
+     
+      return true;
+    } else {
+      if (window.location.href.indexOf('access_token') > -1 && window.location.href.indexOf('#') > -1) {
+        let currentLocation = window.location.href;
+        //let baseUrl = "http://localhost:4200/"
+        let baseUrl = currentLocation.split("#")[0];
+        let accessTokenStr = currentLocation.split("#")[1];
+        let accessQueryStrArray: any = accessTokenStr.split("&");
+        for (let m = 0; m < accessQueryStrArray.length; m++) {
+          let currentParam: any = accessQueryStrArray[m].split("=");
+          if (currentParam.length == 2) {
+            if (this.sharedService.accessTokenParams.indexOf(currentParam[0].trim() > -1)) {
+              if (currentParam[0].trim() == 'access_token') {
+                localStorage.setItem('macAllocatorToken', currentParam[1].trim());
+                let x = new Date();
+                //let currentTime: any = x.getTime();
+                let currentTime:any = x.getTime () + 2 * 60 * 60 * 1000;
+                //console.log("Berfore Time==>",currentTime);
+                localStorage.setItem('tokenLoadTime', currentTime);
+               
+                let sessionStatus:boolean = this.sharedService.isSessionExpires();
+                //console.log("sessionStatus", sessionStatus);
+                if(sessionStatus){
+
+                } else {
+                  this.sharedService.sessionExpire();
+                  localStorage.removeItem('tokenLoadTime');
+                }
+              }
+              if (currentParam[0].trim() == 'token_type') {
+                localStorage.setItem('macAllocatorTokenType', currentParam[1].trim());
+              }
+              if (currentParam[0].trim() == 'expires_in') {
+                localStorage.setItem('macAllocatorExpiresIn', currentParam[1].trim());
+              }
+            }
+          }
+        }
+        window.location.href = baseUrl + "#" + "/mac/client_generator";
+
+      } else {
+        let UrlData:any=window.location.href;//Autual URL: 'https://macallocatorqa.honeywell.com/#/mac/client_generator'
+        this.actualURL=UrlData.split("#")[1];
+        localStorage.setItem('currentURL', this.actualURL);//Result URL: '/mac/client_generator'
+        this.sharedService.redirectForAuthentication();
+      }
+    }
+    // navigate to login page
+    // you can save redirect url so after authing we can move them back to the page they requested
+    return false;
+  }
+  
+}
+
+
+
+
+
